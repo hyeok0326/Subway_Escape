@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subway Escape: 금기된 의식</title>
+    <style>
+        body { margin: 0; background-color: #000; color: #eee; font-family: 'Courier New', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        
+        #game-screen {
+            position: relative; 
+            width: min(100vw, calc(100vh * (1024 / 1536)));
+            height: min(100vh, calc(100vw * (1536 / 1024)));
+            background-color: #0a0a0a; overflow: hidden;
+            box-shadow: 0 0 100px rgba(0,0,0,1) inset;
+        }
+
+        #bg-main { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url("/assets/background/temple.png"); background-size: 100% 100%; z-index: 1; }
+        .bg-horror-active { background-image: url("/assets/background/temple_horror.png") !important; }
+
+        #flashlight { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle 120px at 50% 50%, rgba(255,255,245,0.05) 0%, rgba(0,0,0,0.97) 100%); z-index: 5; pointer-events: none; }
+        
+        .hotspot { position: absolute; cursor: pointer; z-index: 10; } 
+
+        /* 아이템 좌표 */
+        #item-book { width: 30%; height: 12%; top: 80%; left: 55%; }
+        #item-photo { width: 18%; height: 10%; top: 85%; left: 82%; }
+        #item-talisman-L { width: 15%; height: 20%; top: 12%; left: 2%; }
+        #item-talisman-R { width: 15%; height: 20%; top: 17%; left: 82%; }
+        #item-bowl { width: 20%; height: 7%; top: 77%; left: 20%; }
+        #item-salt { width: 15%; height: 8%; top: 80%; left: 40%; }
+        #item-rope { width: 22%; height: 8%; top: 82%; left: 5%; }
+        #item-knife { width: 24%; height: 8%; top: 87%; left: 30%; } 
+        #item-statue { width: 22%; height: 18%; top: 35%; left: 39%; }
+
+        #message-box {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 90%; min-height: 120px; background: rgba(15, 0, 0, 0.96);
+            border: 1px solid #700; padding: 20px; box-sizing: border-box; z-index: 30;
+        }
+        #close-btn { position: absolute; top: 5px; right: 15px; color: #f00; cursor: pointer; font-size: 26px; }
+        
+        #fake-ending {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; color: #fff; display: none; z-index: 150;
+            justify-content: center; align-items: center; text-align: center;
+        }
+
+        /* 줌 인 애니메이션 설정 */
+        #jumpscare-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #000; 
+            background-image: url("/assets/ghost/temple_horror_face.jpg"); 
+            background-size: cover; background-position: center;
+            display: none; z-index: 200;
+            transform: scale(0.5); 
+        }
+
+        @keyframes zoom-in-scare {
+            0% { transform: scale(0.5); opacity: 0; }
+            20% { opacity: 1; }
+            100% { transform: scale(1.4); } 
+        }
+
+        @keyframes impact-shake {
+            0% { transform: translate(0, 0); }
+            20% { transform: translate(-10px, -10px); }
+            40% { transform: translate(10px, 10px); }
+            60% { transform: translate(-10px, 10px); }
+            80% { transform: translate(10px, -10px); }
+            100% { transform: translate(0, 0); }
+        }
+    </style>
+</head>
+<body onmousemove="moveFlashlight(event)">
+
+<div id="game-screen">
+    <div id="bg-main"></div>
+    <div id="flashlight"></div>
+    
+    <div id="fake-ending">
+        <div style="font-size: 24px; letter-spacing: 5px;">-끝-</div>
+    </div>
+
+    <div id="jumpscare-layer"></div>
+    
+    <div id="item-book" class="hotspot" onclick="handleInteraction('book')"></div>
+    <div id="item-photo" class="hotspot" onclick="handleInteraction('photo')"></div>
+    <div id="item-talisman-L" class="hotspot" onclick="handleInteraction('talisman-L')"></div>
+    <div id="item-talisman-R" class="hotspot" onclick="handleInteraction('talisman-R')"></div>
+    <div id="item-bowl" class="hotspot" onclick="handleInteraction('bowl')"></div>
+    <div id="item-salt" class="hotspot" onclick="handleInteraction('salt')"></div>
+    <div id="item-rope" class="hotspot" onclick="handleInteraction('rope')"></div>
+    <div id="item-knife" class="hotspot" onclick="handleInteraction('knife')"></div>
+    <div id="item-statue" class="hotspot" onclick="handleInteraction('statue')"></div>
+
+    <div id="message-box">
+        <span id="close-btn" onclick="closeMessage()">×</span>
+        <div id="msg-text">이곳은 승강장이 아니다. 누군가의 원한이 서린 의식의 제단이다.</div>
+    </div>
+</div>
+
+<script>
+    let discoveredItems = new Set(); 
+    let isMemoryMode = false;        
+    let memoryStep = 0;              
+    let isFinalRealization = false; 
+    let isHorrorState = false; 
+
+    const normalDesc = {
+        book: "악귀의 형상이 그려진 낡은 고서다.",
+        photo: "승강장에서 찍힌 낡은 흑백 사진이다.",
+        'talisman-L': "왼쪽 벽에 붙은 핏빛 부적이다.",
+        'talisman-R': "오른쪽 벽에 붙은 기괴한 문양의 부적이다.",
+        bowl: "검붉은 피가 담긴 사발이다. 비린내가 진동한다.",
+        salt: "바닥에 흩뿌려진 거친 소금 알갱이들이다.",
+        rope: "단단하게 꼬인 낡은 포승줄이다.",
+        knife: "날카롭게 갈린 제례용 칼이다. 차가운 한기가 서려 있다.",
+        statue: "기괴하게 뒤틀린 악귀의 조각상이다."
+    };
+
+    const memorySteps = [
+        { id: 'book', text: "이 책을 펼치지 말았어야 했다. 동생을 살리겠다는 욕심에..." },
+        { id: 'photo', text: "사진 속 동생의 얼굴이 일그러져 있다. 의식은 처음부터 잘못되었다." },
+        { id: 'talisman-L', text: "이 부적은 동생을 지키려 붙인 게 아니다. '그것'을 가두려 했던 것이다." },
+        { id: 'talisman-R', text: "결계가 깨지며 굉음이 울린다! 조각상의 머리가 떨어져 산산조각 났다!" },
+        { id: 'bowl', text: "의식의 대가는 나의 피가 아니었다. 동생의 영혼이었다." },
+        { id: 'salt', text: "소금은 악귀을 막지 못했다. 악귀는 이미 내 안에서 태어났으니까." },
+        { id: 'rope', text: "동생이 나를 막기 위해 스스로를 묶어달라고 애원했던 줄이다." },
+        { id: 'knife', text: "이 칼로 동생의 그림자를 끊어내려 했다. 하지만 내가 끊어낸 것은..." },
+        { id: 'statue', text: "머리가 깨진 조각상 사이로 검은 기운이 뿜어져 나온다. 이제... 끝낼 시간이다." }
+    ];
+
+    function moveFlashlight(e) {
+        const rect = document.getElementById('game-screen').getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 100;
+        const y = ((e.clientY - rect.top) / rect.height) * 100;
+        document.getElementById('flashlight').style.background = `radial-gradient(circle 120px at ${x}% ${y}%, rgba(255,255,245,0.05) 0%, rgba(0,0,0,0.97) 100%)`;
+    }
+
+    function updateMessage(text) {
+        document.getElementById('message-box').style.display = 'block';
+        document.getElementById('msg-text').innerHTML = text; // [기억] 접두사 완전 삭제
+    }
+
+    function closeMessage() { 
+        document.getElementById('message-box').style.display = 'none'; 
+        if (isFinalRealization) triggerFakeEnding();
+    }
+
+    function handleInteraction(itemId) {
+        const screen = document.getElementById('game-screen');
+        const bgMain = document.getElementById('bg-main');
+        
+        if (!isMemoryMode) {
+            discoveredItems.add(itemId);
+            if (itemId === 'statue' && isHorrorState) {
+                updateMessage("조각상의 머리가 떨어져 깨졌다.");
+            } else {
+                updateMessage(normalDesc[itemId]);
+            }
+            if (discoveredItems.size === 9) isMemoryMode = true;
+        } 
+        else {
+            let idx = memorySteps.findIndex(s => s.id === itemId);
+            if (idx !== -1 && idx < memoryStep) {
+                updateMessage(memorySteps[idx].text);
+            } 
+            else if (itemId === memorySteps[memoryStep].id) {
+                updateMessage(memorySteps[memoryStep].text);
+                if (itemId === 'talisman-R') {
+                    screen.style.animation = "impact-shake 0.6s ease-in-out";
+                    bgMain.classList.add('bg-horror-active');
+                    isHorrorState = true;
+                    setTimeout(() => { screen.style.animation = ""; }, 600);
+                }
+                memoryStep++;
+                if (memoryStep === 9) isFinalRealization = true;
+            } 
+            else {
+                if (itemId === 'statue' && isHorrorState) {
+                    updateMessage("조각상의 머리가 떨어져 깨졌다.");
+                } else {
+                    updateMessage(normalDesc[itemId]);
+                }
+            }
+        }
+    }
+
+    function triggerFakeEnding() {
+        document.getElementById('fake-ending').style.display = 'flex';
+        
+        // 1.5초 방심 유도 후 줌 인 점프스케어
+        setTimeout(() => {
+            const jumpscare = document.getElementById('jumpscare-layer');
+            jumpscare.style.display = 'block';
+            jumpscare.style.animation = "zoom-in-scare 0.2s forwards"; 
+            
+            setTimeout(() => {
+                // 엔딩 화면 구성: 다시 시도와 메인 바로가기 버튼 추가
+                document.body.innerHTML = `
+                <div style="background:#000; color:#f00; height:100vh; width:100vw; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; font-family: 'Courier New', monospace;">
+                    <h1 style="font-size:3rem; letter-spacing:10px; margin-bottom: 10px;">RITUAL COMPLETE</h1>
+                    <p style="color:#600; font-size:1.2rem; margin-bottom: 40px;">당신은 무사히 탈출할 수 있을까요?</p>
+                    
+                    <div style="display: flex; gap: 20px;">
+                        <button onclick="location.reload()" style="background:none; border:1px solid #400; color:#800; padding:15px 25px; cursor:pointer; font-family:inherit; transition: 0.3s;">
+                            다시 탈출 시작
+                        </button>
+                        <button onclick="location.href='index.html'" style="background:none; border:1px solid #700; color:#eee; padding:15px 25px; cursor:pointer; font-family:inherit; transition: 0.3s;">
+                            메인으로 돌아가기
+                        </button>
+                    </div>
+                </div>`;
+            }, 2500);
+        }, 1000); 
+    }
+</script>
+</body>
+</html>
