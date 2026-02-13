@@ -4,10 +4,44 @@
     <meta charset="UTF-8">
     <title>Subway Escape: 영혼의 포식자</title>
     <style>
-        :root { --main-bg: #0a0a0a; --accent: #700; --selected: #f00; --btn-bg: #1a1a1a; }
-        body { margin: 0; background: #000; color: #eee; font-family: 'Courier New', monospace; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
-        
-        #game-screen { position: relative; width: 600px; aspect-ratio: 1/1; background: #222; border: 2px solid #333; border-bottom: none; overflow: hidden; margin-top: 20px; }
+        :root { 
+            --main-bg: #0a0a0a; 
+            --accent: #700; 
+            --selected: #f00; 
+            --btn-bg: #1a1a1a; 
+            /* 화면 너비와 높이 중 작은 쪽의 85%를 기준으로 게임 크기 설정 */
+            --game-size: 85vmin; 
+        }
+
+        body { 
+            margin: 0; 
+            background: #000; 
+            color: #eee; 
+            font-family: 'Courier New', monospace; 
+            overflow: hidden; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+        }
+
+        /* 전체를 감싸는 컨테이너 */
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            width: var(--game-size);
+            max-width: 600px; /* PC에서 너무 커지지 않도록 제한 */
+        }
+
+        #game-screen { 
+            position: relative; 
+            width: 100%; 
+            aspect-ratio: 1/1; 
+            background: #222; 
+            border: 2px solid #333; 
+            overflow: hidden; 
+        }
         
         .bg-layer { position: absolute; width: 100%; height: 100%; background-size: cover; background-position: center; transition: opacity 2s ease-in-out; }
         #bg-normal { background-image: url('../assets/background/brother_room.png'); z-index: 1; opacity: 1; }
@@ -18,92 +52,115 @@
 
         #horror-flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(150, 0, 0, 0.6); opacity: 0; z-index: 100; pointer-events: none; }
 
-        /* 핫스팟 기본 커서: 손가락 모양 */
         .hotspot { position: absolute; z-index: 10; cursor: pointer; }
-        /* 획득 후 또는 완료 후: 기본 화살표로 변경 및 클릭 무시 */
-        .hotspot.completed { cursor: default !important; }
+        .hotspot.completed { cursor: default !important; pointer-events: none; }
 
+        /* 핫스팟 위치 (%) */
         #lighter-on-bed { top: 55%; left: 15%; width: 10%; height: 8%;}
         #drawer-area { top: 72%; left: 75%; width: 15%; height: 10%;}
         #closet-area { top: 15%; left: 80%; width: 5%; height: 12%;}
-        #talisman-on-wall { top: 30%; left: 21%; width: 40px; height: 70px;}
+        #talisman-on-wall { top: 30%; left: 21%; width: 8%; height: 12%;}
         #desk-diary { top: 47%; left: 40%; width: 15%; height: 5%;}
 
-        #flashlight { position: absolute; width: 100%; height: 100%; background: radial-gradient(circle 120px at 50% 50%, rgba(255,255,245,0.05) 0%, rgba(0,0,0,0.98) 100%); z-index: 5; pointer-events: none; transition: opacity 1s; }
+        #flashlight { position: absolute; width: 100%; height: 100%; background: radial-gradient(circle 100px at 50% 50%, rgba(255,255,245,0.05) 0%, rgba(0,0,0,0.98) 100%); z-index: 5; pointer-events: none; }
         
-        #blood-splash { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: url('../assets/effect/blood_splatter.png') no-repeat center; background-size: contain; z-index: 500; pointer-events: none; transform-origin: center; }
+        #blood-splash { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: url('../assets/effect/blood_splatter.png') no-repeat center; background-size: contain; z-index: 500; pointer-events: none; }
         .blood-active { display: block !important; animation: blood-burst 0.5s ease-out forwards; }
 
-        #message-box { height: 100px; width: 600px; background: #0f0f0f; border: 2px solid #333; padding: 15px; box-sizing: border-box; z-index: 20; }
-        #msg-text { font-size: 0.95rem; line-height: 1.6; color: #ccc; }
+        #message-box { 
+            height: 80px; 
+            width: 100%; 
+            background: #0f0f0f; 
+            border: 2px solid #333; 
+            border-top: none; 
+            padding: 10px; 
+            box-sizing: border-box; 
+            z-index: 20;
+            font-size: 0.9rem;
+            overflow-y: auto;
+        }
 
-        #inventory { height: 80px; width: 600px; display: flex; gap: 10px; padding: 5px; background: #050505; border: 2px solid #333; border-top: none; justify-content: center; z-index: 20; }
-        .inv-slot { width: 70px; height: 70px; border: 1px solid #333; background: #111; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        #inventory { 
+            height: 70px; 
+            width: 100%; 
+            display: flex; 
+            gap: 8px; 
+            padding: 5px; 
+            background: #050505; 
+            border: 2px solid #333; 
+            border-top: none; 
+            justify-content: center; 
+            box-sizing: border-box;
+        }
+        .inv-slot { 
+            height: 100%; 
+            aspect-ratio: 1/1; 
+            border: 1px solid #333; 
+            background: #111; 
+            cursor: pointer; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+        }
         .inv-slot.selected { border: 2px solid var(--selected); box-shadow: inset 0 0 10px rgba(255,0,0,0.5); }
-        .inv-slot img { width: 85%; height: 85%; object-fit: contain; }
+        .inv-slot img { width: 80%; height: 80%; object-fit: contain; }
 
+        /* 모달 스타일 */
         #game-modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; justify-content: center; align-items: center; }
-        #modal-content { position: relative; width: 80%; height: 70%; background: #fdf5e6; border: 5px solid #8b4513; padding: 30px; box-sizing: border-box; color: #333; line-height: 1.8; }
+        #modal-content { position: relative; width: 80%; height: 70%; background: #fdf5e6; border: 5px solid #8b4513; padding: 20px; box-sizing: border-box; color: #333; overflow-y: auto; }
         #modal-content.horror-diary { background: #200; border-color: #f00; color: #f00; }
 
-        .secret-code { color: inherit; font-weight: inherit; transition: color 0.5s; }
+        .secret-code { color: inherit; transition: color 0.5s; }
         .revealed .secret-code { color: #d00; font-weight: bold; text-shadow: 0 0 5px rgba(255,0,0,0.3); }
 
         #ending-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 1000; justify-content: center; align-items: center; flex-direction: column; }
-        #ending-text { color: #f00; font-size: 1.8rem; font-weight: 900; margin-bottom: 40px; text-align: center; }
-        .ending-btn-group { display: flex; gap: 20px; }
-        .ending-btn { padding: 12px 25px; cursor: pointer; font-family: inherit; font-size: 1rem; background: var(--btn-bg); color: #eee; border: 1px solid #444; transition: all 0.3s; }
-        .ending-btn:hover { background: #f00; color: #000; border-color: #f00; box-shadow: 0 0 15px #f00; }
+        #ending-text { color: #f00; font-size: 1.5rem; font-weight: 900; margin-bottom: 20px; text-align: center; }
 
-        @keyframes blood-burst { 0% { transform: scale(0); opacity: 0; } 40% { opacity: 1; transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
-        @keyframes shake { 0% { transform: translate(4px, 4px); } 50% { transform: translate(-4px, -4px); } 100% { transform: translate(0, 0); } }
+        /* 애니메이션 */
+        @keyframes blood-burst { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes shake { 0% { transform: translate(2px, 2px); } 50% { transform: translate(-2px, -2px); } 100% { transform: translate(0, 0); } }
         .shake-impact { animation: shake 0.1s 5; } 
-        .loop-shake { animation: shake 0.2s infinite; }
         .ending-shake { animation: shake 0.05s infinite !important; }
-        @keyframes flash-anim { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0; } }
-        .flash-active { animation: flash-anim 1.5s forwards; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
     </style>
 </head>
 <body onmousemove="moveFlashlight(event)">
 
-<div id="game-screen">
-    <div id="bg-normal" class="bg-layer"></div>
-    <div id="bg-horror" class="bg-layer"></div>
-    <div id="horror-flash"></div>
+<div id="game-container">
+    <div id="game-screen">
+        <div id="bg-normal" class="bg-layer"></div>
+        <div id="bg-horror" class="bg-layer"></div>
+        <div id="horror-flash"></div>
 
-    <div id="lighter-on-bed" class="hotspot" onclick="pickUpItem('lighter', '라이터')"></div>
-    <div id="talisman-on-wall" class="hotspot" onclick="pickUpItem('talisman', '부적')"></div>
-    <div id="drawer-area" class="hotspot" onclick="interactDrawer()"></div>
-    <div id="closet-area" class="hotspot" onclick="interactCloset()"></div>
-    <div id="desk-diary" class="hotspot" onclick="interactDiary()"></div>
-    
-    <div id="flashlight"></div>
-    <div id="blood-splash"></div>
+        <div id="lighter-on-bed" class="hotspot" onclick="pickUpItem('lighter', '라이터')"></div>
+        <div id="talisman-on-wall" class="hotspot" onclick="pickUpItem('talisman', '부적')"></div>
+        <div id="drawer-area" class="hotspot" onclick="interactDrawer()"></div>
+        <div id="closet-area" class="hotspot" onclick="interactCloset()"></div>
+        <div id="desk-diary" class="hotspot" onclick="interactDiary()"></div>
+        
+        <div id="flashlight"></div>
+        <div id="blood-splash"></div>
 
-    <div id="game-modal">
-        <div id="modal-content">
-            <div style="position: absolute; top: 5px; right: 15px; cursor: pointer; font-size: 24px;" onclick="closeModal()">×</div>
-            <div id="modal-text"></div>
+        <div id="game-modal">
+            <div id="modal-content">
+                <div style="position: absolute; top: 5px; right: 15px; cursor: pointer; font-size: 24px;" onclick="closeModal()">×</div>
+                <div id="modal-text"></div>
+            </div>
         </div>
     </div>
-</div>
 
-<div id="message-box"><div id="msg-text">방 안을 조사하십시오.</div></div>
+    <div id="message-box"><div id="msg-text">방 안을 조사하십시오.</div></div>
 
-<div id="inventory">
-    <div id="slot-0" class="inv-slot" onclick="selectSlot(0)"></div>
-    <div id="slot-1" class="inv-slot" onclick="selectSlot(1)"></div>
-    <div id="slot-2" class="inv-slot" onclick="selectSlot(2)"></div>
-    <div id="slot-3" class="inv-slot" onclick="selectSlot(3)"></div>
+    <div id="inventory">
+        <div id="slot-0" class="inv-slot" onclick="selectSlot(0)"></div>
+        <div id="slot-1" class="inv-slot" onclick="selectSlot(1)"></div>
+        <div id="slot-2" class="inv-slot" onclick="selectSlot(2)"></div>
+        <div id="slot-3" class="inv-slot" onclick="selectSlot(3)"></div>
+    </div>
 </div>
 
 <div id="ending-overlay">
     <div id="ending-text">동생을 죽이는데 성공했다.</div>
-    <div class="ending-btn-group">
-        <button class="ending-btn" onclick="location.reload()">다시하기</button>
-        <button class="ending-btn" onclick="goToMain()">메인으로</button>
-    </div>
+    <button style="padding:10px 20px; cursor:pointer;" onclick="location.reload()">다시하기</button>
 </div>
 
 <script>
@@ -115,7 +172,7 @@
         codeRevealed: false, 
         itemsPicked: {}, 
         horrorDiaryChecked: false,
-        closetOpened: false // 금고 열림 상태
+        closetOpened: false 
     };
 
     function goToMain() {
@@ -128,7 +185,11 @@
         const rect = screen.getBoundingClientRect();
         const x = ((e.clientX - rect.left) / rect.width) * 100;
         const y = ((e.clientY - rect.top) / rect.height) * 100;
-        document.getElementById('flashlight').style.background = `radial-gradient(circle 120px at ${x}% ${y}%, rgba(255,255,245,0.05) 0%, rgba(0,0,0,0.98) 100%)`;
+
+        if (x >= 0 && x <= 100 && y >= 0 && y <= 100) {
+            document.getElementById('flashlight').style.background = 
+                `radial-gradient(circle ${rect.width * 0.2}px at ${x}% ${y}%, rgba(255,255,245,0.05) 0%, rgba(0,0,0,0.98) 100%)`;
+        }
     }
 
     function pickUpItem(id, name) {
@@ -144,7 +205,6 @@
                 target.classList.add('completed');
                 if (id === 'talisman' || id === 'lighter') target.style.opacity = '0';
             }
-
             updateMessage(`${name}(을)를 획득했다.`);
             renderInventory();
         }
@@ -168,150 +228,92 @@
         if (selectedIndices.includes(i)) {
             selectedIndices = selectedIndices.filter(idx => idx !== i);
         } else {
-            if (selectedIndices.length < 2) {
-                selectedIndices.push(i);
-            } else {
-                updateMessage("아이템은 최대 2개까지만 선택할 수 있습니다.");
-            }
+            if (selectedIndices.length < 2) selectedIndices.push(i);
         }
         renderInventory();
-        if (selectedIndices.length === 2) {
-            setTimeout(checkCombination, 200);
-        }
+        if (selectedIndices.length === 2) setTimeout(checkCombination, 200);
     }
 
     function checkCombination() {
         const idx1 = selectedIndices[0];
         const idx2 = selectedIndices[1];
         const ids = [inventory[idx1].id, inventory[idx2].id];
-
-        let messageOverride = null;
         let success = false;
 
         if (ids.includes('mirror') && ids.includes('knife') && !flags.isHorror) {
             triggerRitual();
-            const mirrorIdx = inventory[idx1].id === 'mirror' ? idx1 : idx2;
-            inventory[mirrorIdx] = null;
+            inventory[ids.indexOf('mirror') === 0 ? idx1 : idx2] = null;
             success = true;
-        } 
-        else if (ids.includes('talisman') && ids.includes('lighter')) {
+        } else if (ids.includes('talisman') && ids.includes('lighter')) {
             if (flags.isHorror) {
                 burnTalisman();
-                const talisIdx = inventory[idx1].id === 'talisman' ? idx1 : idx2;
-                inventory[talisIdx] = null;
+                inventory[ids.indexOf('talisman') === 0 ? idx1 : idx2] = null;
                 success = true;
             } else {
-                messageOverride = "아직 부적을 태울 때가 아니다.";
+                updateMessage("아직 부적을 태울 때가 아니다.");
             }
         }
 
-        if (!success) {
-            updateMessage(messageOverride || "아무것도 조합할 수 없다.");
-        }
-
+        if (!success && !flags.talismanBurned) updateMessage("아무 일도 일어나지 않는다.");
         selectedIndices = [];
         renderInventory();
     }
 
     function triggerRitual() {
         flags.isHorror = true;
-        const screen = document.getElementById('game-screen');
-        const flash = document.getElementById('horror-flash');
-        screen.classList.add('shake-impact', 'horror-active');
-        flash.classList.add('flash-active');
-        document.getElementById('flashlight').style.opacity = '0';
-        setTimeout(() => {
-            screen.classList.remove('shake-impact');
-            document.getElementById('flashlight').style.display = 'none';
-            updateMessage("쨍그랑! 거울이 깨지며 공기가 무겁게 내려앉습니다...");
-        }, 1500);
+        document.getElementById('game-screen').classList.add('shake-impact', 'horror-active');
+        document.getElementById('horror-flash').style.animation = "flash-anim 1.5s forwards";
+        document.getElementById('flashlight').style.display = 'none';
+        updateMessage("거울이 깨지며 방 안의 분위기가 기괴하게 변합니다...");
     }
 
     function burnTalisman() {
         flags.talismanBurned = true;
-        document.getElementById('game-screen').classList.add('loop-shake');
-        updateMessage("부적을 태웠습니다! 무언가 울부짖는 소리가 들립니다!");
+        updateMessage("부적을 태우자 공포스러운 비명이 들려옵니다!");
     }
 
     function interactDiary() {
         const selected = selectedIndices.length === 1 ? inventory[selectedIndices[0]] : null;
-        const screen = document.getElementById('game-screen');
-
         if (flags.isHorror) {
             if (selected && selected.id === 'knife' && !flags.horrorDiaryChecked) {
-                updateMessage("일기를 한번 확인해봐야겠다.");
+                updateMessage("먼저 일기를 확인해야 할 것 같다.");
                 return;
             }
             if (selected && selected.id === 'knife' && flags.talismanBurned && flags.horrorDiaryChecked) {
                 document.getElementById('blood-splash').classList.add('blood-active'); 
-                screen.classList.add('ending-shake');
-                setTimeout(() => { document.getElementById('ending-overlay').style.display = 'flex'; }, 1200);
+                document.getElementById('game-screen').classList.add('ending-shake');
+                setTimeout(() => { document.getElementById('ending-overlay').style.display = 'flex'; }, 1500);
                 return;
             }
-            
             flags.horrorDiaryChecked = true;
-            screen.classList.add('shake-impact');
-            setTimeout(() => screen.classList.remove('shake-impact'), 500);
-            showModal(`<div style='font-size:1.1rem; line-height:1.2; animation: pulse 0.1s infinite;'>${"그만".repeat(150)}</div>`, true);
+            showModal(`<div style='font-size:1.2rem; color:red;'>${"죽어 ".repeat(100)}</div>`, true);
         } else {
             if (selected && selected.id === 'lighter') flags.codeRevealed = true;
-            showModal(`
-                <h3>5월 4일</h3>
-                <p class="${flags.codeRevealed ? 'revealed' : ''}">
-                    <span class="secret-code">오</span>늘의 
-                    <span class="secret-code">일</span>기는
-                    어린<span class="secret-code">이</span>날이라
-                    어린이대<span class="secret-code">공</span>원에 가기로 했다.. 
-                    <br><br>
-                    <span style="color:rgba(150,0,0,0.6);">(뒷 내용은 핏자국 때문에 보이지 않는다.)</span>
-                </p>
-            `);
+            showModal(`<h3>5월 4일</h3><p class="${flags.codeRevealed ? 'revealed' : ''}">
+                <span class="secret-code">오</span>늘은... <span class="secret-code">일</span>기가... <span class="secret-code">이</span>상하다... <span class="secret-code">공</span>원...</p>`);
         }
     }
 
-    function interactDrawer() { 
-        if (flags.itemsPicked['mirror']) return;
-        pickUpItem('mirror', '거울'); 
-    }
+    function interactDrawer() { if (!flags.itemsPicked['mirror']) pickUpItem('mirror', '거울'); }
 
-    // --- 수정된 금고 함수 ---
     function interactCloset() { 
-        // 1. 이미 열렸다면 다시 묻지 않고 메시지만 출력
-        if (flags.closetOpened) {
-            updateMessage("이미 열린 금고입니다.");
-            return;
-        }
-
-        // 2. 안 열렸을 때만 암호 묻기
-        const code = prompt("암호:");
-        
-        // 취소 버튼 눌렀을 때 처리
-        if (code === null) return;
-
+        if (flags.closetOpened) { updateMessage("이미 열린 금고입니다."); return; }
+        const code = prompt("암호 4자리를 입력하세요:");
         if (code === "5120") {
-            flags.closetOpened = true; // 상태를 먼저 변경
-            updateMessage("금고가 열렸습니다. 안에서 칼을 발견했다.");
-            pickUpItem('knife', '의식용 칼'); // 아이템 획득
-            
-            // 획득 후 커서 변경을 명시적으로 한 번 더 처리
-            const closetArea = document.getElementById('closet-area');
-            if (closetArea) closetArea.classList.add('completed');
-        } else {
-            alert("틀렸다.");
-        }
+            flags.closetOpened = true;
+            updateMessage("금고가 열렸습니다!");
+            pickUpItem('knife', '의식용 칼');
+            document.getElementById('closet-area').classList.add('completed');
+        } else if (code !== null) { alert("틀렸습니다."); }
     }
 
-    function showModal(html, isHorror = false) {
-        const modal = document.getElementById('game-modal');
+    function showModal(html, horror = false) {
         document.getElementById('modal-text').innerHTML = html;
-        document.getElementById('modal-content').className = isHorror ? 'horror-diary' : '';
-        modal.style.display = 'flex';
+        document.getElementById('modal-content').className = horror ? 'horror-diary' : '';
+        document.getElementById('game-modal').style.display = 'flex';
     }
     function closeModal() { document.getElementById('game-modal').style.display = 'none'; }
     function updateMessage(txt) { document.getElementById('msg-text').innerText = txt; }
 </script>
 </body>
 </html>
-
-
-
