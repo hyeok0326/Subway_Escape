@@ -18,7 +18,11 @@
 
         #horror-flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(150, 0, 0, 0.6); opacity: 0; z-index: 100; pointer-events: none; }
 
+        /* 핫스팟 기본 커서: 손가락 모양 */
         .hotspot { position: absolute; z-index: 10; cursor: pointer; }
+        /* 획득 후 또는 완료 후: 기본 화살표로 변경 및 클릭 무시 */
+        .hotspot.completed { cursor: default; pointer-events: none; }
+
         #lighter-on-bed { top: 55%; left: 15%; width: 10%; height: 8%;}
         #drawer-area { top: 72%; left: 75%; width: 15%; height: 10%;}
         #closet-area { top: 15%; left: 80%; width: 5%; height: 12%;}
@@ -58,6 +62,7 @@
         .ending-shake { animation: shake 0.05s infinite !important; }
         @keyframes flash-anim { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0; } }
         .flash-active { animation: flash-anim 1.5s forwards; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
     </style>
 </head>
 <body onmousemove="moveFlashlight(event)">
@@ -104,7 +109,14 @@
 <script>
     let inventory = [null, null, null, null];
     let selectedIndices = [];
-    let flags = { isHorror: false, talismanBurned: false, codeRevealed: false, itemsPicked: {} };
+    let flags = { 
+        isHorror: false, 
+        talismanBurned: false, 
+        codeRevealed: false, 
+        itemsPicked: {}, 
+        horrorDiaryChecked: false,
+        closetOpened: false // 금고(옷장) 상태 추가
+    };
 
     function goToMain() {
         if(confirm("메인 화면으로 돌아가시겠습니까?")) { window.location.href = 'index.html'; }
@@ -125,11 +137,23 @@
         if (emptyIdx !== -1) {
             inventory[emptyIdx] = { id, name, img: `../assets/items/${id}.png` };
             flags.itemsPicked[id] = true;
-            if (id === 'talisman') document.getElementById('talisman-on-wall').style.display = 'none';
-            if (id === 'lighter') document.getElementById('lighter-on-bed').style.display = 'none';
+            
+            // 획득 시 시각적 처리 및 커서 변경
+            const target = document.getElementById(getHotspotIdByItem(id));
+            if (target) {
+                target.classList.add('completed');
+                if (id === 'talisman' || id === 'lighter') target.style.opacity = '0';
+            }
+
             updateMessage(`${name}(을)를 획득했다.`);
             renderInventory();
         }
+    }
+
+    // 아이템 ID에 따른 핫스팟 ID 매칭 보조 함수
+    function getHotspotIdByItem(id) {
+        const mapping = { 'lighter': 'lighter-on-bed', 'talisman': 'talisman-on-wall', 'mirror': 'drawer-area', 'knife': 'closet-area' };
+        return mapping[id];
     }
 
     function renderInventory() {
@@ -165,14 +189,12 @@
         let messageOverride = null;
         let success = false;
 
-        // 1. 거울 + 칼 (호러 시작)
         if (ids.includes('mirror') && ids.includes('knife') && !flags.isHorror) {
             triggerRitual();
             const mirrorIdx = inventory[idx1].id === 'mirror' ? idx1 : idx2;
             inventory[mirrorIdx] = null;
             success = true;
         } 
-        // 2. 부적 + 라이터
         else if (ids.includes('talisman') && ids.includes('lighter')) {
             if (flags.isHorror) {
                 burnTalisman();
@@ -180,18 +202,12 @@
                 inventory[talisIdx] = null;
                 success = true;
             } else {
-                // 호러 상태가 아닐 때 라이터+부적 조합 시 메시지 고정
                 messageOverride = "아직 부적을 태울 때가 아니다.";
             }
         }
 
-        // 결과에 따른 메시지 처리
-        if (success) {
-            // 내부 함수(triggerRitual, burnTalisman)에서 메시지 업데이트 함
-        } else if (messageOverride) {
-            updateMessage(messageOverride);
-        } else {
-            updateMessage("아무것도 조합할 수 없다.");
+        if (!success) {
+            updateMessage(messageOverride || "아무것도 조합할 수 없다.");
         }
 
         selectedIndices = [];
@@ -220,13 +236,23 @@
 
     function interactDiary() {
         const selected = selectedIndices.length === 1 ? inventory[selectedIndices[0]] : null;
+        const screen = document.getElementById('game-screen');
+
         if (flags.isHorror) {
-            if (selected && selected.id === 'knife' && flags.talismanBurned) {
+            if (selected && selected.id === 'knife' && !flags.horrorDiaryChecked) {
+                updateMessage("일기를 한번 확인해봐야겠다.");
+                return;
+            }
+            if (selected && selected.id === 'knife' && flags.talismanBurned && flags.horrorDiaryChecked) {
                 document.getElementById('blood-splash').classList.add('blood-active'); 
-                document.getElementById('game-screen').classList.add('ending-shake');
+                screen.classList.add('ending-shake');
                 setTimeout(() => { document.getElementById('ending-overlay').style.display = 'flex'; }, 1200);
                 return;
             }
+            
+            flags.horrorDiaryChecked = true;
+            screen.classList.add('shake-impact');
+            setTimeout(() => screen.classList.remove('shake-impact'), 500);
             showModal(`<div style='font-size:1.1rem; line-height:1.2; animation: pulse 0.1s infinite;'>${"그만".repeat(150)}</div>`, true);
         } else {
             if (selected && selected.id === 'lighter') flags.codeRevealed = true;
@@ -244,11 +270,27 @@
         }
     }
 
-    function interactDrawer() { pickUpItem('mirror', '거울'); }
+    function interactDrawer() { 
+        if (flags.itemsPicked['mirror']) return;
+        pickUpItem('mirror', '거울'); 
+    }
+
     function interactCloset() { 
+        // 이미 열린 경우
+        if (flags.closetOpened) {
+            updateMessage("이미 열린 금고입니다.");
+            return;
+        }
+
         const code = prompt("암호:");
-        if (code === "5120") pickUpItem('knife', '의식용 칼');
-        else if (code !== null) alert("틀렸다.");
+        if (code === "5120") {
+            updateMessage("금고가 열렸습니다.");
+            flags.closetOpened = true; // 금고 상태 변경
+            // 아이템 획득 시 커서 변경은 pickUpItem 내에서 처리됨
+            pickUpItem('knife', '의식용 칼');
+        } else if (code !== null) {
+            alert("틀렸다.");
+        }
     }
 
     function showModal(html, isHorror = false) {
