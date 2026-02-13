@@ -9,7 +9,6 @@
             --accent: #700; 
             --selected: #f00; 
             --btn-bg: #1a1a1a; 
-            /* 화면 너비와 높이 중 작은 쪽의 85%를 기준으로 게임 크기 설정 */
             --game-size: 85vmin; 
         }
 
@@ -26,12 +25,11 @@
             height: 100vh; 
         }
 
-        /* 전체를 감싸는 컨테이너 */
         #game-container {
             display: flex;
             flex-direction: column;
             width: var(--game-size);
-            max-width: 600px; /* PC에서 너무 커지지 않도록 제한 */
+            max-width: 600px;
         }
 
         #game-screen { 
@@ -55,7 +53,6 @@
         .hotspot { position: absolute; z-index: 10; cursor: pointer; }
         .hotspot.completed { cursor: default !important; pointer-events: none; }
 
-        /* 핫스팟 위치 (%) */
         #lighter-on-bed { top: 55%; left: 15%; width: 10%; height: 8%;}
         #drawer-area { top: 72%; left: 75%; width: 15%; height: 10%;}
         #closet-area { top: 15%; left: 80%; width: 5%; height: 12%;}
@@ -105,22 +102,21 @@
         .inv-slot.selected { border: 2px solid var(--selected); box-shadow: inset 0 0 10px rgba(255,0,0,0.5); }
         .inv-slot img { width: 80%; height: 80%; object-fit: contain; }
 
-        /* 모달 스타일 */
         #game-modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; justify-content: center; align-items: center; }
-        #modal-content { position: relative; width: 80%; height: 70%; background: #fdf5e6; border: 5px solid #8b4513; padding: 20px; box-sizing: border-box; color: #333; overflow-y: auto; }
+        #modal-content { position: relative; width: 80%; height: 70%; background: #fdf5e6; border: 5px solid #8b4513; padding: 30px; box-sizing: border-box; color: #333; line-height: 1.8; overflow-y: auto; }
         #modal-content.horror-diary { background: #200; border-color: #f00; color: #f00; }
 
-        .secret-code { color: inherit; transition: color 0.5s; }
+        .secret-code { color: inherit; font-weight: inherit; transition: color 0.5s; }
         .revealed .secret-code { color: #d00; font-weight: bold; text-shadow: 0 0 5px rgba(255,0,0,0.3); }
 
         #ending-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 1000; justify-content: center; align-items: center; flex-direction: column; }
         #ending-text { color: #f00; font-size: 1.5rem; font-weight: 900; margin-bottom: 20px; text-align: center; }
 
-        /* 애니메이션 */
         @keyframes blood-burst { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         @keyframes shake { 0% { transform: translate(2px, 2px); } 50% { transform: translate(-2px, -2px); } 100% { transform: translate(0, 0); } }
         .shake-impact { animation: shake 0.1s 5; } 
         .ending-shake { animation: shake 0.05s infinite !important; }
+        @keyframes flash-anim { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0; } }
     </style>
 </head>
 <body onmousemove="moveFlashlight(event)">
@@ -198,7 +194,6 @@
         if (emptyIdx !== -1) {
             inventory[emptyIdx] = { id, name, img: `../assets/items/${id}.png` };
             flags.itemsPicked[id] = true;
-            
             const targetId = getHotspotIdByItem(id);
             const target = document.getElementById(targetId);
             if (target) {
@@ -253,8 +248,7 @@
                 updateMessage("아직 부적을 태울 때가 아니다.");
             }
         }
-
-        if (!success && !flags.talismanBurned) updateMessage("아무 일도 일어나지 않는다.");
+        if (!success) updateMessage("아무 일도 일어나지 않는다.");
         selectedIndices = [];
         renderInventory();
     }
@@ -272,6 +266,7 @@
         updateMessage("부적을 태우자 공포스러운 비명이 들려옵니다!");
     }
 
+    // --- 일기장 내용 원복 완료 ---
     function interactDiary() {
         const selected = selectedIndices.length === 1 ? inventory[selectedIndices[0]] : null;
         if (flags.isHorror) {
@@ -286,11 +281,23 @@
                 return;
             }
             flags.horrorDiaryChecked = true;
-            showModal(`<div style='font-size:1.2rem; color:red;'>${"죽어 ".repeat(100)}</div>`, true);
+            showModal(`<div style='font-size:1.1rem; line-height:1.2; animation: pulse 0.1s infinite;'>${"그만 ".repeat(150)}</div>`, true);
         } else {
-            if (selected && selected.id === 'lighter') flags.codeRevealed = true;
-            showModal(`<h3>5월 4일</h3><p class="${flags.codeRevealed ? 'revealed' : ''}">
-                <span class="secret-code">오</span>늘은... <span class="secret-code">일</span>기가... <span class="secret-code">이</span>상하다... <span class="secret-code">공</span>원...</p>`);
+            if (selected && selected.id === 'lighter') {
+                flags.codeRevealed = true;
+                updateMessage("라이터 불빛으로 숨겨진 글자를 찾아냈다.");
+            }
+            showModal(`
+                <h3>5월 4일</h3>
+                <p class="${flags.codeRevealed ? 'revealed' : ''}">
+                    <span class="secret-code">오</span>늘의 
+                    <span class="secret-code">일</span>기는 어린이날이라 
+                    어린<span class="secret-code">이</span>날이라 어린이대
+                    <span class="secret-code">공</span>원에 가기로 했다.. 
+                    <br><br>
+                    <span style="color:rgba(150,0,0,0.6);">(뒷 내용은 핏자국 때문에 보이지 않는다.)</span>
+                </p>
+            `);
         }
     }
 
